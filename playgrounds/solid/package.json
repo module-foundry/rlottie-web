@@ -1,0 +1,12 @@
+{
+  "name": "@module-foundry/rlottie-solid-playground",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 3001 --strictPort"
+  },
+  "dependencies": {
+    "@module-foundry/rlottie-web": "workspace:*",
+    "solid-js": "catalog:"
+  }
+}

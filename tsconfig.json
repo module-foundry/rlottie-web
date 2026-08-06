@@ -1,0 +1,36 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable", "WebWorker"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noEmit": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "useUnknownInCatchVariables": true,
+    "verbatimModuleSyntax": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "react",
+    "skipLibCheck": true,
+    "paths": {
+      "#core/*": ["./packages/core/src/*"],
+      "#react/*": ["./packages/react/src/*"],
+      "#solid/*": ["./packages/solid/src/*"],
+      "@module-foundry/rlottie-web": ["./packages/core/src/index.ts"],
+      "@module-foundry/rlottie-web/reactjs": ["./packages/react/src/index.ts"],
+      "@module-foundry/rlottie-web/solidjs": ["./packages/solid/src/index.ts"]
+    }
+  },
+  "include": [
+    "*.ts",
+    "benchmarks/**/*.ts",
+    "packages/**/*.ts",
+    "packages/**/*.tsx",
+    "playgrounds/**/*.ts",
+    "playgrounds/**/*.tsx",
+    "tests/**/*.ts",
+    "scripts/**/*.mjs"
+  ],
+  "exclude": ["dist", "node_modules", "rlottie-wasm", "packages/wasm/artifacts"]
+}

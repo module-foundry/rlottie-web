@@ -1,0 +1,13 @@
+{
+  "name": "@module-foundry/rlottie-react-playground",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 3000 --strictPort"
+  },
+  "dependencies": {
+    "@module-foundry/rlottie-web": "workspace:*",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  }
+}

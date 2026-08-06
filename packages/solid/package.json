@@ -1,0 +1,8 @@
+{
+  "name": "@module-foundry/rlottie-solid",
+  "private": true,
+  "type": "module",
+  "peerDependencies": {
+    "solid-js": ">=1.9.0 <2"
+  }
+}

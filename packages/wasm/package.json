@@ -1,0 +1,5 @@
+{
+  "name": "@module-foundry/rlottie-wasm-internal",
+  "private": true,
+  "type": "module"
+}

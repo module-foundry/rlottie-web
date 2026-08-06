@@ -1,0 +1,8 @@
+dist/
+node_modules/
+coverage/
+PLAN.md
+pnpm-lock.yaml
+rlottie-wasm/
+packages/wasm/artifacts/
+packages/wasm/vendor/

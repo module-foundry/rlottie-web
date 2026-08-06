@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
+    "noEmit": false,
+    "outDir": "../../dist/solid",
+    "paths": {
+      "#solid/*": ["./src/*"],
+      "@module-foundry/rlottie-web": ["../../dist/core/index.d.ts"]
+    },
+    "rootDir": "src"
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"]
+}

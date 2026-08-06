@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>RLottie smoke test</title>
+  </head>
+  <body>
+    <canvas id="animation" style="height: 64px; width: 128px"></canvas>
+    <button id="reload" type="button">Reload</button>
+    <button id="destroy" type="button">Destroy</button>
+    <script type="module">
+      import { Format, RLottiePlayer, Type } from "/dist/core/index.js";
+
+      const canvas = document.querySelector("#animation");
+      const player = new RLottiePlayer(canvas, {
+        fps: 60,
+        autoplay: true,
+        visibility: "ignore",
+      });
+      player.subscribe(() => {
+        const snapshot = player.getSnapshot();
+        document.body.dataset.status = snapshot.status;
+        document.body.dataset.width = String(snapshot.metadata?.width ?? 0);
+        if (snapshot.error) document.body.dataset.error = snapshot.error.message;
+      });
+      player.subscribeDiagnostics(diagnostics => {
+        document.body.dataset.renderedFps = String(diagnostics.renderedFps);
+      });
+      window.addEventListener("pagehide", () => player.destroy(), { once: true });
+      document.querySelector("#reload").addEventListener("click", async () => {
+        await player.load({
+          format: Format.Local,
+          type: Type.JSON,
+          json: {
+            v: "5.7.4",
+            fr: 24,
+            ip: 0,
+            op: 24,
+            w: 64,
+            h: 64,
+            nm: "replacement",
+            ddd: 0,
+            assets: [],
+            layers: [],
+          },
+        });
+      });
+      document.querySelector("#destroy").addEventListener("click", () => {
+        player.destroy();
+        player.destroy();
+      });
+      const fixtureResponse = await fetch("/fixtures/json/playground.json");
+
+      if (!fixtureResponse.ok) {
+        throw new Error("Unable to load the animated browser fixture");
+      }
+
+      const animation = await fixtureResponse.json();
+
+      animation.fr = 60;
+      animation.op = 240;
+
+      await player.load({
+        format: Format.Local,
+        type: Type.JSON,
+        json: animation,
+      });
+    </script>
+  </body>
+</html>

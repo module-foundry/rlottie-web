@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RLottie SolidJS playground</title>
+  </head>
+  <body>
+    <main class="playground">
+      <p class="eyebrow">Port 3001</p>
+      <h1>SolidJS playground</h1>
+      <p class="description">
+        Public SolidJS adapter, dedicated worker, and the packaged RLottie WASM runtime.
+      </p>
+      <div class="stage">
+        <canvas id="animation"></canvas>
+      </div>
+      <div class="toolbar">
+        <button id="play" type="button">Play</button>
+        <button id="pause" type="button">Pause</button>
+        <button id="stop" type="button">Stop</button>
+        <span id="status" class="status">Status: idle</span>
+      </div>
+      <p id="error" class="error"></p>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
