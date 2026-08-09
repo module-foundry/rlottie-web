@@ -45,7 +45,8 @@ React is served at `http://localhost:3000`; SolidJS is served at `http://localho
 command builds the package first and keeps both development servers in the same terminal.
 
 Defaults: `autoplay: true`, `loop: true`, `fps: 24`, `frameStep: 1`, `fit: "contain"`,
-`resolution: "auto"`, `pixelRatio: "device"`, `maxPixelRatio: 2`, and adaptive quality disabled.
+`resolution: "auto"`, `pixelRatio: "device"`, no device-pixel-ratio cap, and adaptive quality
+disabled. Set `maxPixelRatio` to impose an explicit cap.
 
 | Option            | Default   | Purpose                                             |
 | ----------------- | --------- | --------------------------------------------------- |
