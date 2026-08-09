@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { fileURLToPath } from "node:url";
 
-const HOST = "127.0.0.1";
+const HOST = "0.0.0.0";
 const ROOT = new URL("../", import.meta.url);
 const VITE = fileURLToPath(new URL("node_modules/vite/bin/vite.js", ROOT));
 const SERVERS = [
