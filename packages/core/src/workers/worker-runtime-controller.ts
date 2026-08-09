@@ -1,17 +1,21 @@
 import { WORKER_TICK_INTERVAL_MS } from "#core/constants/index";
 import { loadNativeFactory } from "#core/native/native-factory";
-import type { WorkerEvent, WorkerRequest } from "#core/types/index";
+import type { SessionRenderPlan, WorkerEvent, WorkerRequest } from "#core/types/index";
 import { AnimationSession } from "#core/workers/animation-session";
+import { SharedFrameCoordinator } from "#core/workers/shared-frame-coordinator";
+import { WorkerAnimationRegistry } from "#core/workers/worker-animation-registry";
 import { WorkerSourceCache } from "#core/workers/worker-source-cache";
 import { WorkerTaskScheduler } from "#core/workers/worker-task-scheduler";
 import { nextWorkerTickDeadline } from "#core/workers/worker-tick-deadline";
 
 export class WorkerRuntimeController {
+  readonly #animations = new WorkerAnimationRegistry();
   readonly #cancelledCreates = new Set<string>();
   #nextTickAt = Number.NEGATIVE_INFINITY;
   readonly #post: (event: WorkerEvent, transfer?: Transferable[]) => void;
   readonly #scheduler = new WorkerTaskScheduler();
   readonly #sessions = new Map<string, AnimationSession>();
+  #sharedFrames: SharedFrameCoordinator | undefined;
   readonly #sources = new WorkerSourceCache();
 
   public constructor(post: (event: WorkerEvent, transfer?: Transferable[]) => void) {
@@ -38,7 +42,16 @@ export class WorkerRuntimeController {
 
     this.#sessions.get(message.playerId)?.destroy();
 
-    const session = new AnimationSession(message, factory, this.#post, json);
+    const nativeLease = this.#animations.acquire(message.sourceKey, json, factory);
+    let session: AnimationSession;
+
+    try {
+      session = new AnimationSession(message, nativeLease, this.#post);
+    } catch (error) {
+      nativeLease.destroy();
+
+      throw error;
+    }
 
     this.#sessions.set(message.playerId, session);
     this.#post({
@@ -129,7 +142,16 @@ export class WorkerRuntimeController {
       throw new Error("Cannot reload a missing worker session");
     }
 
-    session.reload(message, factory, json);
+    const nativeLease = this.#animations.acquire(message.sourceKey, json, factory);
+
+    try {
+      session.reload(message, nativeLease);
+    } catch (error) {
+      nativeLease.destroy();
+
+      throw error;
+    }
+
     this.#post({
       type: "created",
       playerId: message.playerId,
@@ -150,14 +172,36 @@ export class WorkerRuntimeController {
     }
 
     this.#scheduler.cancel();
+    this.#animations.clear();
+    this.#sharedFrames?.destroy();
+    this.#sharedFrames = undefined;
     this.#nextTickAt = Number.NEGATIVE_INFINITY;
   }
 
   readonly #tick = (): void => {
     const now = performance.now();
 
-    for (const session of this.#sessions.values()) {
-      session.tick(now);
+    if (this.#sessions.size < 2) {
+      for (const session of this.#sessions.values()) {
+        session.tick(now);
+      }
+    } else {
+      const plans: SessionRenderPlan[] = [];
+
+      for (const session of this.#sessions.values()) {
+        const plan = session.planTick(now);
+
+        if (plan !== null) {
+          plans.push(plan);
+        }
+      }
+
+      this.#sharedFrames ??= new SharedFrameCoordinator();
+      this.#sharedFrames.render(plans, this.#sessions);
+
+      for (const session of this.#sessions.values()) {
+        session.finishTick(now);
+      }
     }
 
     if (this.#sessions.size > 0) {

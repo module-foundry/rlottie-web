@@ -6,17 +6,38 @@
   </head>
   <body>
     <canvas id="animation" style="height: 64px; width: 128px"></canvas>
+    <canvas id="animation-small" style="height: 32px; width: 64px"></canvas>
     <button id="reload" type="button">Reload</button>
     <button id="destroy" type="button">Destroy</button>
     <script type="module">
       import { Format, RLottiePlayer, Type } from "/dist/core/index.js";
 
       const canvas = document.querySelector("#animation");
+      const smallCanvas = document.querySelector("#animation-small");
       const player = new RLottiePlayer(canvas, {
         fps: 60,
         autoplay: true,
         visibility: "ignore",
       });
+      const smallPlayer = new RLottiePlayer(smallCanvas, {
+        fps: 60,
+        autoplay: true,
+        visibility: "ignore",
+      });
+      const extraPlayers = Array.from({ length: 98 }, () => {
+        const extraCanvas = document.createElement("canvas");
+
+        extraCanvas.style.cssText =
+          "position:fixed;left:-64px;top:0;width:32px;height:16px;pointer-events:none";
+        document.body.append(extraCanvas);
+
+        return new RLottiePlayer(extraCanvas, {
+          fps: 60,
+          autoplay: true,
+          visibility: "ignore",
+        });
+      });
+      const allPlayers = [player, smallPlayer, ...extraPlayers];
       player.subscribe(() => {
         const snapshot = player.getSnapshot();
         document.body.dataset.status = snapshot.status;
@@ -26,7 +47,18 @@
       player.subscribeDiagnostics(diagnostics => {
         document.body.dataset.renderedFps = String(diagnostics.renderedFps);
       });
-      window.addEventListener("pagehide", () => player.destroy(), { once: true });
+      smallPlayer.subscribe(() => {
+        document.body.dataset.smallStatus = smallPlayer.getSnapshot().status;
+      });
+      window.addEventListener(
+        "pagehide",
+        () => {
+          for (const current of allPlayers) {
+            current.destroy();
+          }
+        },
+        { once: true },
+      );
       document.querySelector("#reload").addEventListener("click", async () => {
         await player.load({
           format: Format.Local,
@@ -46,25 +78,85 @@
         });
       });
       document.querySelector("#destroy").addEventListener("click", () => {
-        player.destroy();
-        player.destroy();
+        for (const current of allPlayers) {
+          current.destroy();
+          current.destroy();
+        }
       });
-      const fixtureResponse = await fetch("/fixtures/json/playground.json");
+      const animation = {
+        v: "5.7.4",
+        fr: 60,
+        ip: 0,
+        op: 240,
+        w: 256,
+        h: 128,
+        nm: "browser-smoke",
+        ddd: 0,
+        assets: [],
+        layers: [
+          {
+            ty: 4,
+            ind: 1,
+            ip: 0,
+            op: 240,
+            st: 0,
+            ks: {
+              o: { a: 0, k: 100 },
+              r: { a: 0, k: 0 },
+              p: {
+                a: 1,
+                k: [
+                  {
+                    t: 0,
+                    s: [32, 64, 0],
+                    e: [224, 64, 0],
+                    i: { x: 0.833, y: 0.833 },
+                    o: { x: 0.167, y: 0.167 },
+                    to: [32, 0, 0],
+                    ti: [-32, 0, 0],
+                  },
+                  {
+                    t: 120,
+                    s: [224, 64, 0],
+                    e: [32, 64, 0],
+                    i: { x: 0.833, y: 0.833 },
+                    o: { x: 0.167, y: 0.167 },
+                    to: [-32, 0, 0],
+                    ti: [32, 0, 0],
+                  },
+                  { t: 240, s: [32, 64, 0] },
+                ],
+              },
+              a: { a: 0, k: [0, 0, 0] },
+              s: { a: 0, k: [100, 100, 100] },
+            },
+            shapes: [
+              {
+                ty: "rc",
+                p: { a: 0, k: [0, 0] },
+                s: { a: 0, k: [48, 48] },
+                r: { a: 0, k: 8 },
+              },
+              {
+                ty: "fl",
+                c: { a: 0, k: [0.1, 0.6, 1, 1] },
+                o: { a: 0, k: 100 },
+                r: 1,
+              },
+            ],
+          },
+        ],
+      };
 
-      if (!fixtureResponse.ok) {
-        throw new Error("Unable to load the animated browser fixture");
-      }
-
-      const animation = await fixtureResponse.json();
-
-      animation.fr = 60;
-      animation.op = 240;
-
-      await player.load({
+      const source = {
+        cacheKey: "browser-smoke-shared-source",
         format: Format.Local,
         type: Type.JSON,
         json: animation,
-      });
+      };
+
+      await Promise.all(allPlayers.map(current => current.load(source)));
+      document.body.dataset.playerCount = String(allPlayers.length);
     </script>
   </body>
 </html>

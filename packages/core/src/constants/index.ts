@@ -16,6 +16,7 @@ export const GZIP_MAGIC_SECOND_BYTE = 0x8b;
 export const MAX_WORKERS = 4;
 export const MILLISECONDS_PER_SECOND = 1_000;
 export const PLAYERS_PER_WORKER_BEFORE_SCALE = 4;
+export const PLAYERS_PER_SHARED_RENDER_COHORT = 24;
 export const RGBA_CHANNEL_COUNT = 4;
 export const WORKER_IDLE_TIMEOUT_MS = 5_000;
 export const WORKER_TICK_INTERVAL_MS = 8;

@@ -36,6 +36,7 @@ const getRegistryRecord = (host: WorkerRegistryHost): WorkerPoolRegistryRecord =
 export const acquireWorkerLease = (
   playerId: string,
   onEvent: (event: WorkerEvent) => void,
+  affinityKey?: string,
 ): WorkerLease => {
   if (typeof Worker === "undefined") {
     throw new RLottieError("CANVAS_UNAVAILABLE", "Dedicated Worker is unavailable");
@@ -46,7 +47,7 @@ export const acquireWorkerLease = (
 
   record.references += 1;
 
-  const assignment = record.pool.assign(playerId, onEvent);
+  const assignment = record.pool.assign(playerId, onEvent, affinityKey);
   let destroyed = false;
 
   return {

@@ -73,11 +73,17 @@ export class RenderSurface {
 
     this.#context.putImageData(this.#imageData, rect.x, rect.y);
 
-    if (this.renderPath === "image-bitmap") {
-      const bitmap = this.#canvas.transferToImageBitmap();
+    this.#emitBitmap();
+  }
 
-      this.#post({ bitmap, type: "bitmap", playerId: this.#playerId }, [bitmap]);
+  public presentShared(frame: OffscreenCanvas, rect: Rect): void {
+    if (this.#destroyed) {
+      return;
     }
+
+    this.#context.clearRect(0, 0, this.width, this.height);
+    this.#context.drawImage(frame, rect.x, rect.y, rect.width, rect.height);
+    this.#emitBitmap();
   }
 
   public resize(width: number, height: number): boolean {
@@ -98,5 +104,15 @@ export class RenderSurface {
 
   public get width(): number {
     return this.#canvas.width;
+  }
+
+  #emitBitmap(): void {
+    if (this.renderPath !== "image-bitmap") {
+      return;
+    }
+
+    const bitmap = this.#canvas.transferToImageBitmap();
+
+    this.#post({ bitmap, type: "bitmap", playerId: this.#playerId }, [bitmap]);
   }
 }

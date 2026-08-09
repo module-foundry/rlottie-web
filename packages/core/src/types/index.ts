@@ -110,6 +110,11 @@ export interface NativeAnimation {
   render(frame: number, width: number, height: number): Uint8Array;
 }
 
+export interface NativeAnimationLease {
+  readonly animation: NativeAnimation;
+  destroy(): void;
+}
+
 export interface NativeFactory {
   create(json: string): NativeAnimation;
 }
@@ -173,6 +178,25 @@ export interface QualityTelemetry {
 export interface Rect extends Size {
   x: number;
   y: number;
+}
+
+export interface SessionRenderPlan {
+  frame: number;
+  groupKey: string;
+  playerId: string;
+  rect: Rect;
+  shape: "fill" | "preserve-aspect";
+}
+
+export interface SessionRenderGroup extends Size {
+  plans: SessionRenderPlan[];
+}
+
+export interface SharedFrameSession {
+  presentShared(plan: SessionRenderPlan, frame: OffscreenCanvas): void;
+  recordRender(duration: number): void;
+  renderNative(frame: number, width: number, height: number): Uint8Array;
+  renderPlanned(plan: SessionRenderPlan): void;
 }
 
 export interface RenderProfile {
@@ -326,9 +350,36 @@ export interface WorkerLoadPayload {
 }
 
 export interface WorkerPoolContract {
-  assign(playerId: string, onEvent: (event: WorkerEvent) => void): WorkerLease;
+  assign(
+    playerId: string,
+    onEvent: (event: WorkerEvent) => void,
+    affinityKey?: string,
+  ): WorkerLease;
   destroy(): void;
   scheduleIdleDestroy(callback: () => void): void;
+}
+
+export interface WorkerAffinityCohort {
+  connection: WorkerConnectionContract;
+  references: number;
+}
+
+export interface WorkerAffinityGroup {
+  cohorts: WorkerAffinityCohort[];
+}
+
+export interface WorkerAnimationEntry {
+  animation: NativeAnimation;
+  references: number;
+}
+
+export interface WorkerConnectionContract {
+  assign(
+    playerId: string,
+    callback: (event: WorkerEvent) => void,
+    renderPhase?: number,
+  ): WorkerLease;
+  readonly playerCount: number;
 }
 
 export interface WorkerPoolRegistryRecord {

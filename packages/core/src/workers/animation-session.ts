@@ -1,63 +1,42 @@
 import { MILLISECONDS_PER_SECOND } from "#core/constants/index";
 import { frameAtTime } from "#core/player/timeline";
-import { calculateFitRect } from "#core/sizing/render-size";
 import type {
   CreateWorkerRequest,
   FitMode,
-  NativeAnimation,
-  NativeFactory,
+  NativeAnimationLease,
   ReloadWorkerRequest,
   RenderPath,
   RLottieMetadata,
   RLottieStatus,
+  SessionRenderPlan,
   WorkerEvent,
   WorkerPlaybackOptions,
 } from "#core/types/index";
+import { AnimationRenderer } from "#core/workers/animation-renderer";
 import { FrameRateLimiter } from "#core/workers/frame-rate-limiter";
-import { RenderSurface } from "#core/workers/render-surface";
-import { SessionTelemetry } from "#core/workers/session-telemetry";
 
 export class AnimationSession {
   #baseTime = 0;
   #desiredPlaying = false;
   #destroyed = false;
-  #fit: FitMode;
   #gateRender = true;
   #gateTimeline = true;
-  #lastFrame = -1;
   readonly #limiter: FrameRateLimiter;
   #metadata: RLottieMetadata;
-  #native: NativeAnimation;
   #options: WorkerPlaybackOptions;
+  readonly #renderer: AnimationRenderer;
   #startedAt = performance.now();
   #status: RLottieStatus = "ready";
-  readonly #surface: RenderSurface;
-  readonly #telemetry: SessionTelemetry;
 
   public constructor(
     request: CreateWorkerRequest,
-    factory: NativeFactory,
+    nativeLease: NativeAnimationLease,
     post: (event: WorkerEvent, transfer?: Transferable[]) => void,
-    json: string,
   ) {
     this.#metadata = request.metadata;
-    this.#fit = request.options.fit;
     this.#limiter = new FrameRateLimiter(request.renderPhase);
     this.#options = request.options;
-    this.#native = factory.create(json);
-    this.#surface = new RenderSurface(
-      request.playerId,
-      request.canvas,
-      request.width,
-      request.height,
-      post,
-    );
-    this.#telemetry = new SessionTelemetry(
-      request.playerId,
-      request.workerId,
-      () => this.#surface.renderPath,
-      post,
-    );
+    this.#renderer = new AnimationRenderer(request, nativeLease, post);
   }
 
   public destroy(): void {
@@ -66,8 +45,13 @@ export class AnimationSession {
     }
 
     this.#destroyed = true;
-    this.#surface.destroy();
-    this.#native.delete();
+    this.#renderer.destroy();
+  }
+
+  public finishTick(now: number): void {
+    const time = this.#currentTime(now);
+
+    this.#renderer.emitTelemetry(now, time, this.#status);
   }
 
   public pause(): void {
@@ -79,6 +63,38 @@ export class AnimationSession {
     this.#desiredPlaying = false;
     this.#status = "paused";
     this.#emitState();
+  }
+
+  public planTick(now: number, force = false): SessionRenderPlan | null {
+    if (this.#destroyed) {
+      return null;
+    }
+
+    const time = this.#currentTime(now);
+    const { direction, frameStep } = this.#options;
+    const desiredFrame = frameAtTime(time, this.#metadata, direction, frameStep);
+
+    if (this.#gateRender && force) {
+      this.#limiter.restart(now, this.#options.fps);
+    } else if (this.#gateRender) {
+      const droppedFrames = this.#limiter.consumeFrame(
+        now,
+        this.#options,
+        this.#metadata,
+        this.#renderer.lastFrame,
+        desiredFrame,
+      );
+
+      if (droppedFrames !== null) {
+        this.#renderer.recordDroppedFrames(droppedFrames);
+      } else {
+        return null;
+      }
+    } else {
+      return null;
+    }
+
+    return this.#renderer.plan(desiredFrame);
   }
 
   public play(): void {
@@ -96,21 +112,24 @@ export class AnimationSession {
     this.#emitState();
   }
 
-  public reload(request: ReloadWorkerRequest, factory: NativeFactory, json: string): void {
+  public presentShared(plan: SessionRenderPlan, frame: OffscreenCanvas): void {
+    this.#renderer.presentShared(plan, frame);
+  }
+
+  public recordRender(duration: number): void {
+    this.#renderer.recordRender(duration);
+  }
+
+  public reload(request: ReloadWorkerRequest, nativeLease: NativeAnimationLease): void {
     if (this.#destroyed) {
       return;
     }
 
-    const next = factory.create(json);
-
-    this.#native.delete();
-    this.#native = next;
+    this.#renderer.reload(request, nativeLease);
     this.#metadata = request.metadata;
     this.#options = request.options;
-    this.#fit = request.options.fit;
     this.#baseTime = 0;
     this.#desiredPlaying = false;
-    this.#lastFrame = -1;
     this.#status = "ready";
     this.renderExact(request.posterFrame);
   }
@@ -129,8 +148,16 @@ export class AnimationSession {
     }
   }
 
+  public renderNative(frame: number, width: number, height: number): Uint8Array {
+    return this.#renderer.renderNative(frame, width, height);
+  }
+
   public get renderPath(): RenderPath {
-    return this.#surface.renderPath;
+    return this.#renderer.renderPath;
+  }
+
+  public renderPlanned(plan: SessionRenderPlan): void {
+    this.#render(plan.frame);
   }
 
   public resize(width: number, height: number, fit: FitMode): void {
@@ -138,11 +165,7 @@ export class AnimationSession {
       return;
     }
 
-    this.#fit = fit;
-
-    if (this.#surface.resize(width, height)) {
-      this.#lastFrame = -1;
-    }
+    this.#renderer.resize(width, height, fit);
 
     this.tick(performance.now(), true);
   }
@@ -183,7 +206,7 @@ export class AnimationSession {
     this.#startedAt = now;
 
     if (render) {
-      this.#lastFrame = -1;
+      this.#renderer.update(this.#options.fit);
       this.#limiter.restart(now, this.#options.fps);
     }
   }
@@ -201,34 +224,13 @@ export class AnimationSession {
   }
 
   public tick(now: number, force = false): void {
-    if (this.#destroyed) {
-      return;
+    const plan = this.planTick(now, force);
+
+    if (plan !== null) {
+      this.renderPlanned(plan);
     }
 
-    const time = this.#currentTime(now);
-    const { direction, frameStep } = this.#options;
-    const desiredFrame = frameAtTime(time, this.#metadata, direction, frameStep);
-
-    if (this.#gateRender && force) {
-      if (this.#render(desiredFrame)) {
-        this.#limiter.restart(now, this.#options.fps);
-      }
-    } else if (this.#gateRender) {
-      const droppedFrames = this.#limiter.consumeFrame(
-        now,
-        this.#options,
-        this.#metadata,
-        this.#lastFrame,
-        desiredFrame,
-      );
-
-      if (droppedFrames !== null) {
-        this.#telemetry.recordDroppedFrames(droppedFrames);
-        this.#render(desiredFrame);
-      }
-    }
-
-    this.#telemetry.emitIfDue(now, time, this.#status, this.#lastFrame);
+    this.finishTick(now);
   }
 
   public update(options: WorkerPlaybackOptions): void {
@@ -240,8 +242,7 @@ export class AnimationSession {
 
     this.#syncTime(now);
     this.#options = options;
-    this.#fit = options.fit;
-    this.#lastFrame = -1;
+    this.#renderer.update(options.fit);
     this.#limiter.restart(now, options.fps);
   }
 
@@ -284,23 +285,11 @@ export class AnimationSession {
   }
 
   #emitState(): void {
-    this.#telemetry.emitState(this.#baseTime, this.#status, this.#lastFrame);
+    this.#renderer.emitState(this.#baseTime, this.#status);
   }
 
   #render(frame: number): boolean {
-    if (this.#surface.width === 0 || this.#surface.height === 0) {
-      return false;
-    }
-
-    const started = performance.now();
-    const rect = calculateFitRect(this.#metadata, this.#surface, this.#fit);
-    const pixels = this.#native.render(frame, rect.width, rect.height);
-
-    this.#surface.present(pixels, rect);
-    this.#telemetry.recordRender(performance.now() - started);
-    this.#lastFrame = frame;
-
-    return true;
+    return this.#renderer.render(frame);
   }
 
   #syncTime(now: number): void {

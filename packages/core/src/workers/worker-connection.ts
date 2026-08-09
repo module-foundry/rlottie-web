@@ -25,12 +25,16 @@ export class WorkerConnection {
     this.#worker.addEventListener("error", this.#onError);
   }
 
-  public assign(playerId: string, callback: (event: WorkerEvent) => void): WorkerLease {
+  public assign(
+    playerId: string,
+    callback: (event: WorkerEvent) => void,
+    sharedRenderPhase?: number,
+  ): WorkerLease {
     this.#callbacks.set(playerId, callback);
     this.#nextRenderPhase = (this.#nextRenderPhase + RENDER_PHASE_INCREMENT) % 1;
 
     let destroyed = false;
-    const renderPhase = this.#nextRenderPhase;
+    const renderPhase = sharedRenderPhase ?? this.#nextRenderPhase;
 
     return {
       destroy: () => {

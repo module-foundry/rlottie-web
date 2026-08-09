@@ -48,7 +48,7 @@ export class WorkerBridge {
   }
 
   public async load(payload: WorkerLoadPayload): Promise<void> {
-    this.#ensureLease();
+    this.#ensureLease(payload.sourceKey);
 
     const requestId = this.#requestId + 1;
     const created = new Promise<void>((resolve, reject) => {
@@ -101,8 +101,8 @@ export class WorkerBridge {
     this.#lease?.post(message);
   }
 
-  #ensureLease(): void {
-    this.#lease ??= acquireWorkerLease(this.#playerId, this.#onWorkerEvent);
+  #ensureLease(affinityKey?: string): void {
+    this.#lease ??= acquireWorkerLease(this.#playerId, this.#onWorkerEvent, affinityKey);
   }
 
   readonly #onWorkerEvent = (event: WorkerEvent): void => {

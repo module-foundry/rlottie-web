@@ -8,6 +8,13 @@ The pool is registered under a versioned `Symbol.for` key and creates dedicated 
 Players keep worker affinity. Each worker owns one WASM module, a scheduler, and multiple animation
 sessions. A session has at most one render in progress and one coalesced desired frame.
 
+Keyed identical sources also provide first-load cohort affinity. Cohorts expand across workers at a
+bounded size, so large repeated-source grids parallelize presentation without returning to one
+native raster per player. Within each worker, a reference-counted registry owns one native handle
+per keyed source. On each tick, compatible sessions requesting the same source frame share one
+largest native raster and scale it through a reusable scratch canvas. Timelines, gates, surfaces,
+telemetry, and lifecycle remain owned by each session; divergent frames use independent renders.
+
 The preferred path transfers the visible canvas to a worker. The worker renders into RLottie's
 reusable buffer and presents it with `OffscreenCanvasRenderingContext2D.putImageData`. When direct
 transfer is unavailable, the worker renders to an internal offscreen canvas and transfers an
