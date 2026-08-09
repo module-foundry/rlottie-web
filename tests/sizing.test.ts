@@ -33,6 +33,24 @@ describe("sizing", () => {
     });
   });
 
+  it("uses the full device DPR by default", () => {
+    const profile = resolveRenderProfile(resolveOptions(), 100, () => false);
+
+    expect(calculateRenderSize({ width: 100, height: 100 }, profile, 3)).toEqual({
+      width: 300,
+      height: 300,
+    });
+  });
+
+  it("honors an explicit DPR cap", () => {
+    const profile = resolveRenderProfile(resolveOptions({ maxPixelRatio: 2 }), 100, () => false);
+
+    expect(calculateRenderSize({ width: 100, height: 100 }, profile, 3)).toEqual({
+      width: 200,
+      height: 200,
+    });
+  });
+
   it("keeps fixed backing resolution independent of CSS size and DPR", () => {
     const profile = resolveRenderProfile(
       resolveOptions({ resolution: { width: 128, height: 128 } }),
